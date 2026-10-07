@@ -19,13 +19,31 @@ if not SECRET_KEY or (not DEBUG and SECRET_KEY in ('change-me', 'changeme')):
         'do not use change-me when DEBUG=False.'
     )
 
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-    if h.strip()
-]
+ALLOWED_HOSTS = []
+for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(','):
+    host = host.strip()
+    if not host:
+        continue
+    # Django's subdomain wildcard is a leading dot. "*.vercel.app" is not.
+    if host.startswith('*.'):
+        host = '.' + host[2:]
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
+
+# Preview URLs (loja-….vercel.app) change on every deploy. Vercel sets VERCEL=1.
+if os.getenv('VERCEL') and '.vercel.app' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.vercel.app')
+
 if DEBUG and 'testserver' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('testserver')
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+if os.getenv('VERCEL') and 'https://*.vercel.app' not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append('https://*.vercel.app')
 
 MAX_QTD_ITEM = 20
 MAX_PEDIDOS_POR_HORA = 10
