@@ -1,17 +1,88 @@
+import json
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
+
+from produtos.views import storefront_context
 
 from . import cart
-from produtos.images import first_produto_image
+from .serialize import cart_payload
 
 
 def ver_carrinho(request):
-    dados = cart.get_cart_lines(request.session)
-    for line in dados['lines']:
-        line['imagem'] = first_produto_image(line['produto'].slug)
-    return render(request, 'carrinho/carrinho.html', {'carrinho': dados})
+    context = storefront_context(request)
+    context['abrir_carrinho'] = True
+    return render(request, 'produtos/home.html', context)
+
+
+def _json_body(request):
+    raw = request.body.decode('utf-8') if request.body else ''
+    if not raw.strip():
+        raw = '{}'
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _cart_action(request, action):
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({'error': 'Requisição inválida.'}, status=400)
+    try:
+        action(data)
+    except ValidationError as exc:
+        return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
+    return JsonResponse(cart_payload(request.session))
+
+
+@require_GET
+def api_carrinho(request):
+    return JsonResponse(cart_payload(request.session))
+
+
+@require_POST
+def api_adicionar(request):
+    def action(data):
+        cart.add_item(
+            request.session,
+            data.get('produto_id'),
+            data.get('tamanho'),
+            data.get('quantidade', 1),
+        )
+
+    return _cart_action(request, action)
+
+
+@require_POST
+def api_atualizar(request):
+    def action(data):
+        cart.update_qty(
+            request.session,
+            data.get('produto_id'),
+            data.get('tamanho'),
+            data.get('quantidade'),
+        )
+
+    return _cart_action(request, action)
+
+
+@require_POST
+def api_remover(request):
+    def action(data):
+        cart.remove_item(
+            request.session,
+            data.get('produto_id'),
+            data.get('tamanho'),
+        )
+
+    return _cart_action(request, action)
 
 
 @require_POST
