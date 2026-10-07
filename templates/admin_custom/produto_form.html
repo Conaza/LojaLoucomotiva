@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} — Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{% url 'pedidos:admin_lista' %}?aba=produtos" class="text-decoration-none">&larr; Voltar aos produtos</a>
+  <h1 class="hero-brand mt-2" style="font-size:2.2rem">{{ titulo }}</h1>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="mb-4" style="max-width:40rem">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="mb-3">
+    <label class="form-label" for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+    {{ form.nome }}
+    {% if form.nome.errors %}<div class="text-danger small">{{ form.nome.errors }}</div>{% endif %}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="{{ form.descricao.id_for_label }}">{{ form.descricao.label }}</label>
+    {{ form.descricao }}
+    {% if form.descricao.errors %}<div class="text-danger small">{{ form.descricao.errors }}</div>{% endif %}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="{{ form.preco.id_for_label }}">{{ form.preco.label }}</label>
+    {{ form.preco }}
+    {% if form.preco.errors %}<div class="text-danger small">{{ form.preco.errors }}</div>{% endif %}
+  </div>
+
+  <div class="mb-3 form-check">
+    {{ form.ativo }}
+    <label class="form-check-label" for="{{ form.ativo.id_for_label }}">{{ form.ativo.label }}</label>
+    {% if form.ativo.errors %}<div class="text-danger small">{{ form.ativo.errors }}</div>{% endif %}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+    {{ form.slug }}
+    {% if form.slug.help_text %}<div class="form-text">{{ form.slug.help_text }}</div>{% endif %}
+    {% if form.slug.errors %}<div class="text-danger small">{{ form.slug.errors }}</div>{% endif %}
+  </div>
+
+  <fieldset class="mb-3">
+    <legend class="form-label fs-6">{{ form.tamanhos.label }}</legend>
+    <div class="d-flex flex-wrap gap-3">
+      {% for checkbox in form.tamanhos %}
+        <div class="form-check">
+          {{ checkbox.tag }}
+          <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+        </div>
+      {% endfor %}
+    </div>
+    {% if form.tamanhos.errors %}<div class="text-danger small">{{ form.tamanhos.errors }}</div>{% endif %}
+  </fieldset>
+
+  <div class="mb-4">
+    {% if produto %}
+      <div class="form-label">Imagens</div>
+      <p class="form-text">A ordem é a mesma da loja: Imagem 1 é a primeira do carrossel. Apenas PNG, máx. 5&nbsp;MB.</p>
+      {% if galeria %}
+        <div class="admin-image-grid mb-3">
+          {% for img in galeria %}
+            <div class="admin-image-card">
+              <img src="{{ img.url }}" alt="Imagem {{ img.index|add:1 }}">
+              <div class="small fw-semibold mb-2">Imagem {{ img.index|add:1 }}</div>
+              <label class="form-label small mb-1" for="{{ img.field.id_for_label }}">Substituir</label>
+              {{ img.field }}
+              {% if img.field.errors %}<div class="text-danger small">{{ img.field.errors }}</div>{% endif %}
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-ink w-100 mt-2"
+                formaction="{% url 'produtos:admin_imagem_excluir' produto.id %}"
+                formnovalidate
+                name="slot"
+                value="{{ img.index }}"
+              >Remover</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-secondary small">Este produto ainda não tem imagens.</p>
+      {% endif %}
+      <label class="form-label" for="{{ form.nova_imagem.id_for_label }}">{{ form.nova_imagem.label }}</label>
+      {{ form.nova_imagem }}
+      {% if form.nova_imagem.errors %}<div class="text-danger small">{{ form.nova_imagem.errors }}</div>{% endif %}
+    {% else %}
+      <label class="form-label" for="{{ form.imagens.id_for_label }}">{{ form.imagens.label }}</label>
+      {{ form.imagens }}
+      <div class="form-text">Apenas PNG. Máx. 5&nbsp;MB cada. A ordem da seleção vira Imagem 1, 2, 3…</div>
+      {% if form.imagens.errors %}<div class="text-danger small">{{ form.imagens.errors }}</div>{% endif %}
+    {% endif %}
+  </div>
+
+  <div class="d-flex flex-wrap gap-2">
+    <button type="submit" class="btn btn-accent">Salvar</button>
+    <a href="{% url 'pedidos:admin_lista' %}?aba=produtos" class="btn btn-outline-ink">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Carrinho — Loucomotiva{% endblock %}
+
+{% block content %}
+<h1 class="hero-brand" style="font-size:2.5rem">Carrinho</h1>
+
+{% if carrinho.vazio %}
+  <p class="text-secondary">Seu carrinho está vazio.</p>
+  <a href="{% url 'produtos:home' %}" class="btn btn-accent">Continuar comprando</a>
+{% else %}
+  <div class="table-responsive">
+    <table class="table cart-table align-middle">
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Tamanho</th>
+          <th>Quantidade</th>
+          <th>Valor</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in carrinho.lines %}
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-3">
+                {% if line.imagem %}
+                  <img class="cart-thumb" src="{{ line.imagem }}" alt="{{ line.produto.nome }}">
+                {% endif %}
+                <div>
+                  <strong>{{ line.produto.nome }}</strong>
+                  <div class="small text-secondary">R$ {{ line.preco_unitario }} / un.</div>
+                </div>
+              </div>
+            </td>
+            <td>{% if line.tamanho == "Unico" %}Único{% else %}{{ line.tamanho }}{% endif %}</td>
+            <td>
+              <form method="post" action="{% url 'carrinho:atualizar' %}" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="produto_id" value="{{ line.produto_id }}">
+                <input type="hidden" name="tamanho" value="{{ line.tamanho }}">
+                <input type="number" name="quantidade" value="{{ line.quantidade }}" min="1" max="20" class="form-control form-control-sm" style="width:4.5rem">
+                <button type="submit" class="btn btn-sm btn-outline-ink">Atualizar</button>
+              </form>
+            </td>
+            <td>R$ {{ line.subtotal }}</td>
+            <td>
+              <form method="post" action="{% url 'carrinho:remover' %}">
+                {% csrf_token %}
+                <input type="hidden" name="produto_id" value="{{ line.produto_id }}">
+                <input type="hidden" name="tamanho" value="{{ line.tamanho }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Remover</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mt-3">
+    <p class="fs-5 fw-bold mb-0">TOTAL: R$ {{ carrinho.valor_total }}</p>
+    <div class="d-flex gap-2">
+      <a href="{% url 'produtos:home' %}" class="btn btn-outline-ink">Continuar comprando</a>
+      <a href="{% url 'pedidos:finalizar' %}" class="btn btn-accent">Finalizar pedido</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

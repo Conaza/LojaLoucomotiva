@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Finalizar pedido — Loucomotiva{% endblock %}
+
+{% block content %}
+<h1 class="hero-brand" style="font-size:2.5rem">Finalizar pedido</h1>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <h2 class="h4 mb-3">Resumo</h2>
+    <ul class="list-group list-group-flush mb-3">
+      {% for line in carrinho.lines %}
+        <li class="list-group-item bg-transparent px-0">
+          <strong>{{ line.produto.nome }}</strong>
+          <div class="small text-secondary">
+            Tamanho: {% if line.tamanho == "Unico" %}Único{% else %}{{ line.tamanho }}{% endif %}
+            · Qtd: {{ line.quantidade }}
+            · Unit.: R$ {{ line.preco_unitario }}
+          </div>
+          <div>Subtotal: R$ {{ line.subtotal }}</div>
+        </li>
+      {% endfor %}
+    </ul>
+    <p>Quantidade total de produtos: {{ carrinho.quantidade_total }}</p>
+    <p class="fs-5 fw-bold">TOTAL DA COMPRA: R$ {{ carrinho.valor_total }}</p>
+  </div>
+
+  <div class="col-lg-6">
+    <h2 class="h4 mb-3">Seus dados</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+        {{ form.nome }}
+        {% if form.nome.errors %}<div class="text-danger small">{{ form.nome.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.contato.id_for_label }}">{{ form.contato.label }}</label>
+        {{ form.contato }}
+        {% if form.contato.errors %}<div class="text-danger small">{{ form.contato.errors|join:", " }}</div>{% endif %}
+      </div>
+      <fieldset class="mb-3">
+        <legend class="fs-6">{{ form.forma_pagamento.label }}</legend>
+        {% for radio in form.forma_pagamento %}
+          <div class="form-check">
+            {{ radio.tag }}
+            <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+          </div>
+        {% endfor %}
+        {% if form.forma_pagamento.errors %}<div class="text-danger small">{{ form.forma_pagamento.errors|join:", " }}</div>{% endif %}
+      </fieldset>
+      <p class="small text-secondary">Ao finalizar, você será redirecionado para o checkout seguro da InfinitePay para pagar com Pix ou cartão de crédito. Depois do pagamento, você volta automaticamente para a loja.</p>
+      <button type="submit" class="btn btn-accent">Finalizar pedido</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

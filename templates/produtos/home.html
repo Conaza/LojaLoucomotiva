@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Loucomotiva — Loja{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="hero-brand">KIT 2026</h1>
+  <p class="hero-lead">Garanta já o seu!</p>
+</section>
+
+<section class="product-grid">
+  {% for item in catalogo %}
+    <article
+      class="product-tile"
+      style="animation-delay: {{ forloop.counter0 }}00ms"
+      data-bs-toggle="modal"
+      data-bs-target="#produtoModal"
+      data-produto-id="{{ item.produto.id }}"
+      data-nome="{{ item.produto.nome }}"
+      data-descricao="{{ item.produto.descricao }}"
+      data-preco="{{ item.produto.preco }}"
+      data-tamanhos='{{ item.tamanhos|join:"," }}'
+      data-imagens='[{% for img in item.imagens %}"{{ img }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+    >
+      <div class="product-carousel" data-carousel>
+        {% if item.imagens %}
+          {% for img in item.imagens %}
+            <img src="{{ img }}" alt="{{ item.produto.nome }}" class="{% if forloop.first %}is-active{% endif %}" data-index="{{ forloop.counter0 }}">
+          {% endfor %}
+          {% if item.imagens|length > 1 %}
+            <div class="carousel-nav">
+              <button type="button" data-carousel-prev aria-label="Anterior">&lt;</button>
+              <span class="carousel-counter"><span data-carousel-current>1</span> / {{ item.imagens|length }}</span>
+              <button type="button" data-carousel-next aria-label="Próxima">&gt;</button>
+            </div>
+          {% endif %}
+        {% else %}
+          <img src="{% static 'images/produtos/placeholder.svg' %}" alt="{{ item.produto.nome }}" class="is-active">
+        {% endif %}
+      </div>
+      <div class="product-body">
+        <h2>{{ item.produto.nome }}</h2>
+        <div class="price">R$ {{ item.produto.preco }}</div>
+        <button type="button" class="btn btn-accent w-100">Comprar</button>
+      </div>
+    </article>
+  {% empty %}
+    <p>Nenhum produto disponível no momento.</p>
+  {% endfor %}
+</section>
+
+<div class="modal fade" id="produtoModal" tabindex="-1" aria-labelledby="produtoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-4" id="produtoModalLabel">Produto</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form method="post" action="{% url 'carrinho:adicionar' %}" id="formAddCarrinho">
+        {% csrf_token %}
+        <input type="hidden" name="produto_id" id="modalProdutoId">
+        <input type="hidden" name="next" value="home">
+        <div class="modal-body">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="product-carousel" id="modalCarousel" data-carousel></div>
+            </div>
+            <div class="col-md-6">
+              <h3 id="modalNome" class="mb-2"></h3>
+              <p id="modalDescricao" class="text-secondary"></p>
+              <p class="price mb-3">R$ <span id="modalPreco"></span></p>
+
+              <div class="mb-3">
+                <label for="modalTamanho" class="form-label">Tamanho</label>
+                <select class="form-select" name="tamanho" id="modalTamanho" required>
+                  <option value="">Selecione</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Quantidade</label>
+                <div class="qty-control">
+                  <button type="button" id="qtyMinus" aria-label="Diminuir">−</button>
+                  <input type="number" class="form-control text-center" style="width:4rem" name="quantidade" id="modalQtd" value="1" min="1" max="20" required>
+                  <button type="button" id="qtyPlus" aria-label="Aumentar">+</button>
+                </div>
+              </div>
+
+              <p class="fw-bold">Total: R$ <span id="modalTotal">0,00</span></p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-ink" data-bs-dismiss="modal">Fechar</button>
+          <button type="submit" class="btn btn-accent">Adicionar ao carrinho</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

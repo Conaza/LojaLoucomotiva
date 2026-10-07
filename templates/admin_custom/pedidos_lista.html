@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Admin — Loucomotiva{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <h1 class="hero-brand mb-0" style="font-size:2.2rem">Admin</h1>
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-ink btn-sm">Sair</button>
+  </form>
+</div>
+
+<ul class="nav nav-tabs mb-4" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button
+      class="nav-link {% if aba == 'pedidos' %}active{% endif %}"
+      id="tab-pedidos"
+      data-bs-toggle="tab"
+      data-bs-target="#pane-pedidos"
+      type="button"
+      role="tab"
+      aria-controls="pane-pedidos"
+      aria-selected="{% if aba == 'pedidos' %}true{% else %}false{% endif %}"
+    >Pedidos</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button
+      class="nav-link {% if aba == 'produtos' %}active{% endif %}"
+      id="tab-produtos"
+      data-bs-toggle="tab"
+      data-bs-target="#pane-produtos"
+      type="button"
+      role="tab"
+      aria-controls="pane-produtos"
+      aria-selected="{% if aba == 'produtos' %}true{% else %}false{% endif %}"
+    >Produtos</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div
+    class="tab-pane fade {% if aba == 'pedidos' %}show active{% endif %}"
+    id="pane-pedidos"
+    role="tabpanel"
+    aria-labelledby="tab-pedidos"
+  >
+    <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mb-3">
+      <a href="{% url 'pedidos:admin_excel' %}" class="btn btn-accent btn-sm">Exportar Excel</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Contato</th>
+            <th>Produtos</th>
+            <th>Pagamento</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pedido in pedidos %}
+            <tr>
+              <td>{{ pedido.nome_cliente }}</td>
+              <td>{{ pedido.contato }}</td>
+              <td>{{ pedido.nomes_produtos }}</td>
+              <td>
+                {{ pedido.get_forma_pagamento_display }}
+                <div class="small text-secondary">{{ pedido.status_pagamento_display }}</div>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-accent"
+                  data-bs-toggle="modal"
+                  data-bs-target="#pedidoModal{{ pedido.id }}"
+                >VIEW</button>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">Nenhum pedido ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div
+    class="tab-pane fade {% if aba == 'produtos' %}show active{% endif %}"
+    id="pane-produtos"
+    role="tabpanel"
+    aria-labelledby="tab-produtos"
+  >
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <p class="mb-0 text-secondary">Gerencie o catálogo da loja.</p>
+      <a href="{% url 'produtos:admin_criar' %}" class="btn btn-accent btn-sm">Novo produto</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Nome</th>
+            <th>Preço</th>
+            <th>Tamanhos</th>
+            <th>Ativo</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in produtos_lista %}
+            <tr>
+              <td>
+                {% if item.imagem %}
+                  <img class="admin-thumb" src="{{ item.imagem }}" alt="">
+                {% else %}
+                  <span class="text-secondary small">—</span>
+                {% endif %}
+              </td>
+              <td>{{ item.produto.nome }}</td>
+              <td>R$ {{ item.produto.preco }}</td>
+              <td>{{ item.tamanhos|join:", "|default:"—" }}</td>
+              <td>{% if item.produto.ativo %}Sim{% else %}Não{% endif %}</td>
+              <td>
+                <div class="admin-actions d-flex flex-wrap gap-1">
+                  <a href="{% url 'produtos:admin_editar' item.produto.id %}" class="btn btn-sm btn-outline-ink">Editar</a>
+                  <a href="{% url 'produtos:admin_excluir' item.produto.id %}" class="btn btn-sm btn-outline-ink">Excluir</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6">Nenhum produto cadastrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% for pedido in pedidos %}
+  <div class="modal fade" id="pedidoModal{{ pedido.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5">Detalhes do pedido #{{ pedido.id }}</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Cliente:</strong> {{ pedido.nome_cliente }}</p>
+          <p><strong>Contato:</strong> {{ pedido.contato }}</p>
+          <p><strong>Pagamento:</strong> {{ pedido.get_forma_pagamento_display }} ({{ pedido.status_pagamento_display }})</p>
+          <p><strong>Data:</strong> {{ pedido.data_criacao }}</p>
+          <hr>
+          <h3 class="h6">Produtos</h3>
+          {% for item in pedido.itens.all %}
+            <div class="mb-3">
+              <strong>{{ item.nome_produto }}</strong><br>
+              Tamanho: {% if item.tamanho == "Unico" %}Único{% else %}{{ item.tamanho }}{% endif %}<br>
+              Quantidade: {{ item.quantidade }}<br>
+              Valor unitário: R$ {{ item.preco_unitario }}<br>
+              Subtotal: R$ {{ item.subtotal }}
+            </div>
+          {% endfor %}
+          <p class="fw-bold mb-0">TOTAL: R$ {{ pedido.valor_total }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

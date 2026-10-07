@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Pedido realizado — Loucomotiva{% endblock %}
+
+{% block extra_head %}
+  {% if pagamento and pagamento.status == "PENDENTE" %}<meta http-equiv="refresh" content="10">{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="text-center py-5">
+  <h1 class="hero-brand" style="font-size:2.5rem">Pedido realizado com sucesso!</h1>
+  <p class="lead mt-3">Obrigado pela sua compra, {{ pedido.nome_cliente }}!</p>
+  <p>Pedido #{{ pedido.id }} · Total: <strong>R$ {{ pedido.valor_total }}</strong></p>
+  {% if pagamento %}
+    {% if pagamento.status == "PAGO" %}
+      <p class="text-success fw-bold mb-1">Pagamento confirmado{% if pagamento.capture_method %} ({{ pagamento.metodo_display }}){% endif %}.</p>
+      {% if pagamento.receipt_url %}
+        <p><a href="{{ pagamento.receipt_url }}" target="_blank" rel="noopener noreferrer">Ver comprovante</a></p>
+      {% endif %}
+    {% else %}
+      <p class="mb-2">
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+        Aguardando a confirmação do pagamento. Esta página atualiza sozinha.
+      </p>
+      {% if pagamento.checkout_url %}
+        <p class="small text-secondary mb-2">Ainda não pagou ou fechou a página de pagamento?</p>
+        <a href="{{ pagamento.checkout_url }}" class="btn btn-outline-ink mb-2">Ir para o pagamento</a>
+      {% endif %}
+    {% endif %}
+  {% else %}
+    <p>Forma de pagamento: <strong>{{ pedido.get_forma_pagamento_display }}</strong></p>
+  {% endif %}
+  <p class="text-secondary mt-3">Entraremos em contato para confirmar os detalhes do pedido.</p>
+  <a href="{% url 'produtos:home' %}" class="btn btn-accent mt-3">Voltar à loja</a>
+</section>
+{% endblock %}

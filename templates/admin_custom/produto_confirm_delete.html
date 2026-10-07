@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Excluir {{ produto.nome }} — Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4" style="max-width:32rem">
+  <a href="{% url 'pedidos:admin_lista' %}?aba=produtos" class="text-decoration-none">&larr; Voltar aos produtos</a>
+  <h1 class="hero-brand mt-2" style="font-size:2.2rem">Excluir produto</h1>
+  <p class="text-secondary">Tem certeza que deseja excluir <strong>{{ produto.nome }}</strong>? Esta ação não pode ser desfeita.</p>
+
+  {% if imagem %}
+    <img class="admin-thumb mb-3" src="{{ imagem }}" alt="" style="width:96px;height:96px">
+  {% endif %}
+
+  <form method="post" class="d-flex flex-wrap gap-2">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-accent">Excluir definitivamente</button>
+    <a href="{% url 'pedidos:admin_lista' %}?aba=produtos" class="btn btn-outline-ink">Cancelar</a>
+  </form>
+</div>
+{% endblock %}
