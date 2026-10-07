@@ -12,8 +12,7 @@
 <body>
   <header class="site-header">
     <nav class="navbar navbar-expand-lg">
-      <div class="container">
-        <a class="navbar-brand brand-name" href="{% url 'produtos:home' %}">Loucomotiva</a>
+      <div class="container site-header-bar">
         <button
           class="navbar-toggler"
           type="button"
@@ -25,6 +24,9 @@
         >
           <span class="navbar-toggler-icon"></span>
         </button>
+        <a class="brand-logo" href="{% url 'produtos:home' %}">
+          <img src="{% static 'images/loucomotiva.png' %}" alt="Loucomotiva">
+        </a>
         <div class="collapse navbar-collapse" id="mainNav">
           <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3 py-2 py-lg-0">
             <a class="nav-link" id="carrinho-link" href="{% url 'carrinho:ver' %}">
