@@ -7,6 +7,11 @@ app_name = 'produtos'
 urlpatterns = [
     path('', views.home, name='home'),
     path(
+        'media/produtos/<slug:slug>/<str:filename>',
+        views.produto_imagem,
+        name='imagem',
+    ),
+    path(
         'admin-pedidos/produtos/novo/',
         admin_views.produto_criar,
         name='admin_criar',

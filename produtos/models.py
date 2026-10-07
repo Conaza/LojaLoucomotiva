@@ -22,7 +22,11 @@ class Produto(models.Model):
                 message='Slug deve conter apenas letras minúsculas, números e hífens.',
             )
         ],
-        help_text='Identificador da pasta de imagens (media/produtos/<slug>/).',
+        help_text='Identificador da galeria de imagens.',
+    )
+    galeria_no_banco = models.BooleanField(
+        default=False,
+        help_text='Quando marcado, a galeria vem do banco, mesmo vazia.',
     )
 
     class Meta:
@@ -61,3 +65,24 @@ class ProdutoTamanho(models.Model):
 
     def __str__(self):
         return f'{self.produto.nome} — {self.get_tamanho_display()}'
+
+
+class ProdutoImagem(models.Model):
+    produto = models.ForeignKey(
+        Produto,
+        on_delete=models.CASCADE,
+        related_name='imagens',
+    )
+    ordem = models.PositiveSmallIntegerField()
+    sufixo = models.CharField(max_length=8)
+    conteudo = models.BinaryField()
+    atualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ordem']
+        unique_together = [('produto', 'ordem')]
+        verbose_name = 'Imagem do produto'
+        verbose_name_plural = 'Imagens do produto'
+
+    def __str__(self):
+        return f'{self.produto.slug} — {self.ordem + 1:02d}{self.sufixo}'

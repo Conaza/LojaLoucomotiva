@@ -23,6 +23,18 @@ from .models import Produto, ProdutoTamanho, Tamanho
 staff_required = staff_member_required(login_url=settings.LOGIN_URL)
 
 
+def _image_limit_context() -> dict:
+    each = settings.MAX_PRODUTO_IMAGE_BYTES
+    total = settings.MAX_PRODUTO_UPLOAD_BYTES
+    return {
+        'max_imagens': settings.MAX_PRODUTO_IMAGES,
+        'max_imagem_bytes': each,
+        'max_upload_bytes': total,
+        'max_imagem_mb': each // (1024 * 1024),
+        'max_upload_mb': total // (1024 * 1024),
+    }
+
+
 def _sync_tamanhos(produto: Produto, selected: list[str]) -> None:
     selected_set = set(selected)
     valid = {c.value for c in Tamanho}
@@ -66,6 +78,7 @@ def produto_criar(request):
         'titulo': 'Novo produto',
         'produto': None,
         'galeria': [],
+        **_image_limit_context(),
     })
 
 
@@ -116,6 +129,7 @@ def produto_editar(request, produto_id):
         'titulo': f'Editar — {produto.nome}',
         'produto': produto,
         'galeria': _bind_gallery_fields(form, produto.slug),
+        **_image_limit_context(),
     })
 
 

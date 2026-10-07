@@ -62,7 +62,7 @@
   <div class="mb-4">
     {% if produto %}
       <div class="form-label">Imagens</div>
-      <p class="form-text">A ordem é a mesma da loja: Imagem 1 é a primeira do carrossel. Apenas PNG, máx. 5&nbsp;MB.</p>
+      <p class="form-text">A ordem é a mesma da loja: Imagem 1 é a primeira do carrossel. Apenas PNG, máx. {{ max_imagem_mb }}&nbsp;MB.</p>
       {% if galeria %}
         <div class="admin-image-grid mb-3">
           {% for img in galeria %}
@@ -90,10 +90,111 @@
       {{ form.nova_imagem }}
       {% if form.nova_imagem.errors %}<div class="text-danger small">{{ form.nova_imagem.errors }}</div>{% endif %}
     {% else %}
-      <label class="form-label" for="{{ form.imagens.id_for_label }}">{{ form.imagens.label }}</label>
-      {{ form.imagens }}
-      <div class="form-text">Apenas PNG. Máx. 5&nbsp;MB cada. A ordem da seleção vira Imagem 1, 2, 3…</div>
+      <div class="form-label">Imagens</div>
+      <div
+        id="imagem-slots"
+        data-max="{{ max_imagens }}"
+        data-max-each="{{ max_imagem_bytes }}"
+        data-max-total="{{ max_upload_bytes }}"
+      >
+        <div class="imagem-slot mb-2">
+          <label class="form-label small mb-1" for="{{ form.imagens.id_for_label }}">Imagem 1</label>
+          {{ form.imagens }}
+          <button type="button" class="btn btn-sm btn-outline-ink mt-2 d-none remover-imagem">Remover</button>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-ink" id="adicionar-imagem">Adicionar outra imagem</button>
+      <div class="form-text">Apenas PNG. Até {{ max_imagem_mb }}&nbsp;MB cada, no máximo {{ max_imagens }} imagens e {{ max_upload_mb }}&nbsp;MB no total. A ordem dos campos é a ordem do carrossel.</div>
+      <div id="imagem-aviso" class="text-danger small mt-2" hidden></div>
       {% if form.imagens.errors %}<div class="text-danger small">{{ form.imagens.errors }}</div>{% endif %}
+      <script>
+        (function () {
+          var box = document.getElementById('imagem-slots');
+          var addBtn = document.getElementById('adicionar-imagem');
+          var aviso = document.getElementById('imagem-aviso');
+          var form = box && box.closest('form');
+          if (!box || !addBtn || !form) return;
+          var max = Number(box.dataset.max);
+          var maxEach = Number(box.dataset.maxEach);
+          var maxTotal = Number(box.dataset.maxTotal);
+
+          function slots() {
+            return Array.prototype.slice.call(box.querySelectorAll('.imagem-slot'));
+          }
+
+          function renumber() {
+            slots().forEach(function (slot, index) {
+              var label = slot.querySelector('label');
+              var input = slot.querySelector('input[type="file"]');
+              var remove = slot.querySelector('.remover-imagem');
+              var id = 'id_imagens_' + index;
+              if (label) {
+                label.textContent = 'Imagem ' + (index + 1);
+                label.setAttribute('for', id);
+              }
+              if (input) {
+                input.id = id;
+                input.name = 'imagens';
+                input.removeAttribute('multiple');
+              }
+              if (remove) remove.classList.toggle('d-none', index === 0);
+            });
+            addBtn.disabled = slots().length >= max;
+          }
+
+          addBtn.addEventListener('click', function () {
+            if (slots().length >= max) return;
+            var clone = slots()[0].cloneNode(true);
+            var input = clone.querySelector('input[type="file"]');
+            if (input) input.value = '';
+            box.appendChild(clone);
+            renumber();
+          });
+
+          box.addEventListener('click', function (event) {
+            var btn = event.target.closest('.remover-imagem');
+            if (!btn || slots().length <= 1) return;
+            btn.closest('.imagem-slot').remove();
+            renumber();
+          });
+
+          form.addEventListener('submit', function (event) {
+            var files = slots().map(function (slot) {
+              var input = slot.querySelector('input[type="file"]');
+              return input && input.files && input.files[0];
+            }).filter(Boolean);
+            var message = '';
+            if (files.length > max) {
+              message = 'No máximo ' + max + ' imagens.';
+            }
+            var total = 0;
+            for (var i = 0; i < files.length; i++) {
+              var file = files[i];
+              if (!file.name.toLowerCase().endsWith('.png')) {
+                message = 'Apenas arquivos PNG são aceitos.';
+                break;
+              }
+              if (file.size > maxEach) {
+                message = 'Cada imagem deve ter no máximo ' + (maxEach / (1024 * 1024)) + ' MB.';
+                break;
+              }
+              total += file.size;
+            }
+            if (!message && total > maxTotal) {
+              message = 'A soma das imagens deve ter no máximo ' + (maxTotal / (1024 * 1024)) + ' MB.';
+            }
+            if (message) {
+              event.preventDefault();
+              aviso.hidden = false;
+              aviso.textContent = message;
+            } else {
+              aviso.hidden = true;
+            }
+          });
+
+          renumber();
+        })();
+      </script>
     {% endif %}
   </div>
 

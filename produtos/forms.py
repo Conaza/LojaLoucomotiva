@@ -8,7 +8,21 @@ from .models import Produto, Tamanho
 
 
 class MultipleFileInput(forms.ClearableFileInput):
+    """One file per input. The field still reads every input named imagens."""
+
     allow_multiple_selected = True
+
+    def __init__(self, attrs=None):
+        attrs = dict(attrs or {})
+        attrs['multiple'] = False
+        super().__init__(attrs)
+
+
+def _format_mb(num_bytes: int) -> str:
+    mb = num_bytes / (1024 * 1024)
+    if mb.is_integer():
+        return f'{int(mb)} MB'
+    return f'{mb:.1f} MB'
 
 
 class MultipleFileField(forms.FileField):
@@ -116,18 +130,28 @@ class ProdutoAdminForm(forms.ModelForm):
         if not name.endswith('.png'):
             raise forms.ValidationError('Apenas arquivos PNG são aceitos.')
         size = getattr(uploaded, 'size', None)
-        max_bytes = getattr(settings, 'MAX_PRODUTO_IMAGE_BYTES', 5 * 1024 * 1024)
+        max_bytes = getattr(settings, 'MAX_PRODUTO_IMAGE_BYTES', 1 * 1024 * 1024)
         if size is not None and size > max_bytes:
-            raise forms.ValidationError('Cada imagem deve ter no máximo 5 MB.')
+            raise forms.ValidationError(
+                f'Cada imagem deve ter no máximo {_format_mb(max_bytes)}.'
+            )
         return uploaded
 
     def clean_imagens(self):
-        files = self.cleaned_data.get('imagens') or []
+        files = [item for item in (self.cleaned_data.get('imagens') or []) if item]
+        max_count = getattr(settings, 'MAX_PRODUTO_IMAGES', 8)
+        max_total = getattr(settings, 'MAX_PRODUTO_UPLOAD_BYTES', 4 * 1024 * 1024)
+        if len(files) > max_count:
+            raise forms.ValidationError(f'No máximo {max_count} imagens.')
         valid = []
+        total = 0
         for uploaded in files:
-            if not uploaded:
-                continue
             valid.append(self._clean_png(uploaded))
+            total += getattr(uploaded, 'size', 0) or 0
+        if total > max_total:
+            raise forms.ValidationError(
+                f'A soma das imagens deve ter no máximo {_format_mb(max_total)}.'
+            )
         return valid
 
     def clean_nova_imagem(self):

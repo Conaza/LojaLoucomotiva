@@ -6,9 +6,10 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from produtos.forms import ProdutoAdminForm
 from produtos.images import (
     list_produto_gallery,
     list_produto_images,
@@ -16,24 +17,18 @@ from produtos.images import (
     replace_produto_image,
     save_produto_images,
 )
-from produtos.models import Produto
+from produtos.models import Produto, ProdutoImagem
 
 PNG_BYTES = b'\x89PNG\r\n\x1a\n' + b'0' * 16
-_IMAGE_SUFFIXES = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'}
+ONE_MB = b'\x89PNG\r\n\x1a\n' + b'0' * (1024 * 1024 - 8)
 
 
-def _png(name='foto.png'):
-    return SimpleUploadedFile(name, PNG_BYTES, content_type='image/png')
+def _png(name='foto.png', payload=None):
+    body = PNG_BYTES if payload is None else b'\x89PNG\r\n\x1a\n' + payload
+    return SimpleUploadedFile(name, body, content_type='image/png')
 
 
-def _image_names(folder: Path) -> list[str]:
-    return sorted(
-        p.name for p in folder.iterdir()
-        if p.is_file() and p.suffix.lower() in _IMAGE_SUFFIXES
-    )
-
-
-class ProdutoGalleryTests(SimpleTestCase):
+class ProdutoGalleryTests(TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
@@ -56,6 +51,15 @@ class ProdutoGalleryTests(SimpleTestCase):
         for name in names:
             (folder / name).write_bytes(f'<svg>{name}</svg>'.encode())
 
+    def _produto(self, slug):
+        return Produto.objects.create(
+            nome=slug,
+            descricao='',
+            preco='10.00',
+            ativo=True,
+            slug=slug,
+        )
+
     def test_gallery_matches_storefront_order(self):
         self._static('camisa', ['imagem2.svg', 'imagem1.svg', 'imagem3.svg'])
         urls = list_produto_images('camisa')
@@ -69,10 +73,16 @@ class ProdutoGalleryTests(SimpleTestCase):
 
     def test_replace_copies_static_and_keeps_other_slots(self):
         self._static('camisa', ['imagem1.svg', 'imagem2.svg', 'imagem3.svg'])
+        produto = self._produto('camisa')
         self.assertTrue(replace_produto_image('camisa', 0, _png('nova.png')))
-        self.assertEqual(_image_names(self.media / 'camisa'), ['01.png', '02.svg', '03.svg'])
+        produto.refresh_from_db()
+        self.assertTrue(produto.galeria_no_banco)
+        rows = list(produto.imagens.order_by('ordem'))
+        self.assertEqual([row.sufixo for row in rows], ['.png', '.svg', '.svg'])
+        self.assertEqual(bytes(rows[0].conteudo), PNG_BYTES)
+        self.assertIn(b'imagem2.svg', bytes(rows[1].conteudo))
         self.assertTrue((self.static / 'camisa' / 'imagem1.svg').is_file())
-        self.assertIn(b'imagem2.svg', (self.media / 'camisa' / '02.svg').read_bytes())
+        self.assertFalse((self.media / 'camisa').exists())
         urls = list_produto_images('camisa')
         self.assertEqual(len(urls), 3)
         self.assertIn('/media/produtos/camisa/01.png', urls[0])
@@ -81,21 +91,39 @@ class ProdutoGalleryTests(SimpleTestCase):
 
     def test_remove_renumbers_following_images(self):
         self._static('bone', ['imagem1.svg', 'imagem2.svg'])
+        produto = self._produto('bone')
         self.assertTrue(remove_produto_image_at('bone', 0))
-        self.assertEqual(_image_names(self.media / 'bone'), ['01.svg'])
-        self.assertIn(b'imagem2.svg', (self.media / 'bone' / '01.svg').read_bytes())
+        rows = list(produto.imagens.order_by('ordem'))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].sufixo, '.svg')
+        self.assertEqual(rows[0].ordem, 0)
+        self.assertIn(b'imagem2.svg', bytes(rows[0].conteudo))
         urls = list_produto_images('bone')
         self.assertEqual(len(urls), 1)
         self.assertIn('01.svg', urls[0])
 
     def test_remove_all_does_not_restore_static(self):
         self._static('short', ['imagem1.svg'])
+        produto = self._produto('short')
         self.assertTrue(remove_produto_image_at('short', 0))
+        produto.refresh_from_db()
+        self.assertTrue(produto.galeria_no_banco)
+        self.assertEqual(produto.imagens.count(), 0)
         self.assertEqual(list_produto_images('short'), [])
+        self.assertTrue((self.static / 'short' / 'imagem1.svg').is_file())
 
     def test_save_writes_uploads_in_selection_order(self):
-        saved = save_produto_images('novo', [_png('b.png'), _png('a.png')])
+        self._produto('novo')
+        first = b'\x89PNG\r\n\x1a\n' + b'aaa'
+        second = b'\x89PNG\r\n\x1a\n' + b'bbb'
+        saved = save_produto_images('novo', [
+            _png('b.png', b'aaa'),
+            _png('a.png', b'bbb'),
+        ])
         self.assertEqual(saved, ['01.png', '02.png'])
+        rows = list(ProdutoImagem.objects.filter(produto__slug='novo').order_by('ordem'))
+        self.assertEqual(bytes(rows[0].conteudo), first)
+        self.assertEqual(bytes(rows[1].conteudo), second)
         urls = list_produto_images('novo')
         self.assertEqual(len(urls), 2)
         self.assertIn('01.png', urls[0])
@@ -160,3 +188,110 @@ class ProdutoEditPageTests(TestCase):
         self.assertIn('/media/produtos/camisa/03.svg', body)
         self.assertLess(body.index('01.png'), body.index('02.svg'))
         self.assertLess(body.index('02.svg'), body.index('03.svg'))
+
+    def test_home_lists_static_svg_until_upload(self):
+        home = self.client.get(reverse('produtos:home'))
+        body = home.content.decode()
+        self.assertIn('/static/images/produtos/camisa/imagem1.svg', body)
+        self.assertNotIn('/media/produtos/camisa/', body)
+
+
+class ProdutoCreateImageTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_superuser(
+            username='staff',
+            email='staff@example.com',
+            password='password12345',
+        )
+        self.client.force_login(user)
+
+    def test_create_page_can_add_another_image(self):
+        response = self.client.get(reverse('produtos:admin_criar'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Adicionar outra imagem')
+        self.assertContains(response, 'id="imagem-slots"')
+        self.assertContains(response, 'no máximo 8 imagens')
+        self.assertContains(response, 'Até 1')
+        html = response.content.decode()
+        self.assertNotIn(' multiple', html)
+        self.assertNotIn('multiple=', html)
+
+    def test_create_saves_two_images_in_order(self):
+        first = b'\x89PNG\r\n\x1a\n' + b'aaa'
+        second = b'\x89PNG\r\n\x1a\n' + b'bbb'
+        response = self.client.post(
+            reverse('produtos:admin_criar'),
+            {
+                'nome': 'Bone novo',
+                'descricao': 'Aba',
+                'preco': '40.00',
+                'ativo': 'on',
+                'slug': 'bone-novo',
+                'imagens': [_png('um.png', b'aaa'), _png('dois.png', b'bbb')],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        produto = Produto.objects.get(slug='bone-novo')
+        self.assertTrue(produto.galeria_no_banco)
+        rows = list(produto.imagens.order_by('ordem'))
+        self.assertEqual([row.ordem for row in rows], [0, 1])
+        self.assertEqual(bytes(rows[0].conteudo), first)
+        self.assertEqual(bytes(rows[1].conteudo), second)
+        self.assertEqual([row.sufixo for row in rows], ['.png', '.png'])
+
+    @override_settings(DEBUG=False, SECURE_SSL_REDIRECT=False)
+    def test_serve_image_when_debug_off(self):
+        produto = Produto.objects.create(
+            nome='Servida',
+            descricao='',
+            preco='10.00',
+            slug='servida',
+            galeria_no_banco=True,
+        )
+        ProdutoImagem.objects.create(
+            produto=produto,
+            ordem=0,
+            sufixo='.png',
+            conteudo=PNG_BYTES,
+        )
+        response = self.client.get(reverse('produtos:imagem', args=['servida', '01.png']))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, PNG_BYTES)
+        self.assertEqual(response['Content-Type'], 'image/png')
+        missing = self.client.get(reverse('produtos:imagem', args=['servida', '02.png']))
+        self.assertEqual(missing.status_code, 404)
+        wrong = self.client.get(reverse('produtos:imagem', args=['servida', '01.svg']))
+        self.assertEqual(wrong.status_code, 404)
+
+
+class ProdutoImageFormTests(TestCase):
+    def _form(self, files):
+        return ProdutoAdminForm(
+            data={'nome': 'Peca', 'descricao': '', 'preco': '10.00', 'slug': 'peca'},
+            files={'imagens': files},
+        )
+
+    def test_rejects_image_over_one_megabyte(self):
+        too_big = SimpleUploadedFile(
+            'grande.png',
+            ONE_MB + b'0',
+            content_type='image/png',
+        )
+        form = self._form([too_big])
+        self.assertFalse(form.is_valid())
+        self.assertIn('1 MB', form.errors['imagens'][0])
+
+    def test_rejects_total_over_four_megabytes(self):
+        files = [
+            SimpleUploadedFile(f'f{i}.png', ONE_MB, content_type='image/png')
+            for i in range(5)
+        ]
+        form = self._form(files)
+        self.assertFalse(form.is_valid())
+        self.assertIn('4 MB', form.errors['imagens'][0])
+
+    def test_rejects_more_than_eight_images(self):
+        files = [_png(f'f{i}.png') for i in range(9)]
+        form = self._form(files)
+        self.assertFalse(form.is_valid())
+        self.assertIn('8', form.errors['imagens'][0])
