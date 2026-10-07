@@ -1,120 +1,32 @@
 # Loucomotiva — Loja Virtual
 
-Loja virtual simples com Django + MySQL: catálogo com carrossel, modal de compra, carrinho em sessão, checkout com pagamento por Pix ou cartão no checkout da InfinitePay (veja [docs/INTEGRACAO_INFINITEPAY.md](docs/INTEGRACAO_INFINITEPAY.md)) e painel de pedidos para staff.
+Loja de roupas em que o cliente escolhe o produto, monta o carrinho e paga com Pix ou cartão. A equipe acompanha os pedidos e mantém o catálogo pelo painel.
 
-## Tecnologias
+## Para quem compra
 
-- Python 3.x
-- Django
-- MySQL (`mysqlclient`)
-- HTML / CSS / JavaScript
-- Bootstrap 5 (CDN)
-- Gunicorn + WhiteNoise (produção)
+- **Catálogo.** A página inicial lista os produtos ativos, com carrossel de fotos, preço e descrição.
+- **Compra.** Um modal pede o tamanho (PP, P, M, G, GG, XG ou único) e a quantidade. Só entram tamanhos marcados como disponíveis.
+- **Carrinho.** Os itens ficam na sessão. Dá para alterar a quantidade, remover uma peça ou esvaziar o carrinho antes de fechar o pedido.
+- **Checkout.** O cliente informa nome e telefone. O valor é calculado de novo no servidor, a partir do preço cadastrado e do que está no carrinho.
+- **Pagamento.** Ao finalizar, a loja abre o checkout da InfinitePay. O cliente paga com Pix ou cartão de crédito nessa página e volta para a loja.
+- **Confirmação.** A página de sucesso mostra se o pagamento já foi confirmado ou se ainda está aguardando. Ela só abre para o pedido da própria sessão.
 
-## Estrutura
+O fluxo do pagamento, do webhook e do retorno está em [docs/INTEGRACAO_INFINITEPAY.md](docs/INTEGRACAO_INFINITEPAY.md).
 
-```text
-config/       # settings, urls, wsgi
-produtos/     # catálogo, tamanhos, imagens
-carrinho/     # sessão
-pedidos/      # checkout, confirmação, admin-pedidos
-templates/
-static/
-```
+## Para a equipe
 
-## Instalação local
+- **Pedidos.** Quem tem acesso de staff vê a lista em `/admin-pedidos/`, com cliente, itens, total e status do pagamento (aguardando ou pago).
+- **Planilha.** A mesma lista pode ser baixada em Excel.
+- **Catálogo.** No painel dá para criar, editar e excluir produtos, escolher os tamanhos disponíveis e trocar as fotos da galeria.
+- **Admin do Django.** Usuários e o restante dos dados também ficam em `/admin/`.
 
-```bash
-python -m venv venv
-# Windows (PowerShell). Se aparecer "execução de scripts foi desabilitada",
-# libere só para a sessão atual antes de ativar:
-#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-venv\Scripts\activate
-# Linux/macOS:
-# source venv/bin/activate
+## O que a loja protege
 
-pip install -r requirements.txt
-copy .env.example .env   # ou cp .env.example .env
-```
+- Credenciais ficam só no ambiente, fora do código.
+- O preço e os itens do pedido são lidos de novo no servidor, a partir do carrinho e do cadastro.
+- A confirmação de pagamento só vale depois que a InfinitePay confirma a transação e o valor.
+- A página de sucesso abre só para o pedido guardado na sessão de quem comprou.
+- O painel de pedidos e de produtos exige usuário staff.
+- O nome da pasta de imagens é validado para não sair do diretório do produto.
 
-Edite o `.env` com `SECRET_KEY`, credenciais MySQL e `ALLOWED_HOSTS`.
-
-Crie o banco MySQL (utf8mb4), por exemplo:
-
-```sql
-CREATE DATABASE loucomotiva CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-```bash
-python manage.py migrate
-python manage.py seed_produtos
-python manage.py createsuperuser
-python manage.py runserver
-```
-
-Abra http://127.0.0.1:8000/
-
-## Variáveis de ambiente (`.env`)
-
-| Variável | Descrição |
-|----------|-----------|
-| `SECRET_KEY` | Chave secreta Django (obrigatória; não use `change-me` em produção) |
-| `DEBUG` | `True` local / `False` produção |
-| `ALLOWED_HOSTS` | Hosts separados por vírgula |
-| `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | MySQL |
-| `DB_SSL` | `True` para MySQL remoto com TLS (ex.: Aiven) |
-| `INFINITEPAY_*` / `SITE_URL` | InfiniteTag, token do webhook e URL pública do site — veja [docs/INTEGRACAO_INFINITEPAY.md](docs/INTEGRACAO_INFINITEPAY.md) |
-
-O arquivo `.env` **não** deve ir para o GitHub.
-
-## Imagens dos produtos
-
-Organize em:
-
-```text
-static/images/produtos/<slug>/imagem1.jpg
-```
-
-O campo `slug` do produto aponta para a pasta. Substitua os placeholders SVG por fotos reais mantendo o mesmo `slug`.
-
-## URLs principais
-
-| URL | Função |
-|-----|--------|
-| `/` | Catálogo |
-| `/carrinho/` | Carrinho |
-| `/finalizar-pedido/` | Checkout |
-| `/pedido/sucesso/<id>/` | Confirmação (somente o pedido da sessão) |
-| `/pedido/<id>/pagamento/retorno/` | Retorno do checkout InfinitePay (confirma o pagamento) |
-| `/pagamentos/infinitepay/webhook/` | Webhook da InfinitePay |
-| `/admin-pedidos/` | Lista de pedidos (staff) |
-| `/admin/` | Django Admin |
-
-## Produção / deploy
-
-1. `DEBUG=False`, `SECRET_KEY` forte, `ALLOWED_HOSTS` corretos
-2. `DB_SSL=True` se o MySQL for remoto
-3. `python manage.py collectstatic`
-4. Subir com Gunicorn (`Procfile` incluso) + HTTPS no provedor
-5. Com `DEBUG=False`, cookies Secure, HSTS e redirect SSL são ativados automaticamente
-
-### MySQL remoto (ex.: Aiven)
-
-Use host/porta/usuário/senha do provedor no `.env` e `DB_SSL=True`. A aplicação não depende de um provedor específico.
-
-## Segurança (resumo)
-
-- Credenciais só via `.env`
-- CSRF em todos os POSTs do carrinho/checkout
-- Preço sempre recalculado no backend
-- Página de sucesso anti-IDOR (sessão)
-- `/admin-pedidos/` exige `is_staff`
-- Slug de imagens sanitizado (anti path traversal)
-
-## Comandos úteis
-
-```bash
-python manage.py seed_produtos
-python manage.py collectstatic
-python manage.py createsuperuser
-```
+Para subir o projeto localmente ou em produção, siga [docs/IMPLEMENTACAO.md](docs/IMPLEMENTACAO.md).
