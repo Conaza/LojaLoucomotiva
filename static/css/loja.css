@@ -72,8 +72,10 @@ body {
   display: inline-flex;
   align-items: center;
   height: var(--header-row);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 0;
+  background: transparent;
   padding: 0.35rem 0.55rem;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (min-width: 992px) {
@@ -91,6 +93,12 @@ body {
 }
 
 .navbar-toggler:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.navbar-toggler:focus-visible {
+  outline: 0;
   box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.35);
 }
 
