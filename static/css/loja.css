@@ -408,6 +408,11 @@ body {
   z-index: 200;
 }
 
+.store-modal-root {
+  height: 100vh;
+  height: 100dvh;
+}
+
 .store-modal-backdrop,
 .cart-drawer-backdrop {
   position: absolute;
@@ -420,13 +425,24 @@ body {
 .store-modal {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   width: min(920px, calc(100% - 2rem));
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   margin: 1rem auto;
-  overflow: auto;
+  overflow: hidden;
   background: #fff;
   box-shadow: var(--shadow);
   border-radius: var(--radius-modal);
+}
+
+.store-modal > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .store-modal-header,
@@ -446,7 +462,15 @@ body {
   margin: 0;
 }
 
+.store-modal-header,
+.store-modal-footer {
+  flex-shrink: 0;
+}
+
 .store-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding: 1.25rem;
 }
 
@@ -567,6 +591,11 @@ body {
 
   .store-modal-footer {
     flex-direction: column;
+  }
+
+  .store-modal .product-carousel {
+    max-height: 42vh;
+    max-height: 42dvh;
   }
 
   .cart-line-actions {
