@@ -1,5 +1,7 @@
 """Produto and size models."""
 
+import unicodedata
+
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
@@ -48,13 +50,44 @@ class Tamanho(models.TextChoices):
     UNICO = 'Unico', 'Único'
 
 
+TAMANHO_MAX_LENGTH = 10
+
+
+def label_tamanho(valor: str) -> str:
+    return Tamanho.UNICO.label if valor == Tamanho.UNICO else valor
+
+
+def chave_tamanho(valor: str) -> str:
+    """Comparison key that ignores case and accents ('único' == 'Unico')."""
+    sem_acento = unicodedata.normalize('NFKD', valor.strip())
+    return ''.join(c for c in sem_acento if not unicodedata.combining(c)).casefold()
+
+
+def ordenar_tamanhos(valores) -> list[str]:
+    """Default sizes in enum order first, then any custom size alphabetically."""
+    padroes = [t.value for t in Tamanho]
+
+    def chave(valor):
+        if valor in padroes:
+            return (0, padroes.index(valor), '')
+        return (1, 0, chave_tamanho(valor))
+
+    return sorted(set(valores), key=chave)
+
+
+def tamanhos_conhecidos() -> list[tuple[str, str]]:
+    salvos = ProdutoTamanho.objects.values_list('tamanho', flat=True).distinct()
+    valores = ordenar_tamanhos([*(t.value for t in Tamanho), *salvos])
+    return [(valor, label_tamanho(valor)) for valor in valores]
+
+
 class ProdutoTamanho(models.Model):
     produto = models.ForeignKey(
         Produto,
         on_delete=models.CASCADE,
         related_name='tamanhos',
     )
-    tamanho = models.CharField(max_length=10, choices=Tamanho.choices)
+    tamanho = models.CharField(max_length=TAMANHO_MAX_LENGTH)
     disponivel = models.BooleanField(default=True)
 
     class Meta:
@@ -64,7 +97,7 @@ class ProdutoTamanho(models.Model):
         ordering = ['produto', 'tamanho']
 
     def __str__(self):
-        return f'{self.produto.nome} — {self.get_tamanho_display()}'
+        return f'{self.produto.nome} — {label_tamanho(self.tamanho)}'
 
 
 class ProdutoImagem(models.Model):

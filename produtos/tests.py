@@ -17,7 +17,7 @@ from produtos.images import (
     replace_produto_image,
     save_produto_images,
 )
-from produtos.models import Produto, ProdutoImagem
+from produtos.models import Produto, ProdutoImagem, ProdutoTamanho
 
 PNG_BYTES = b'\x89PNG\r\n\x1a\n' + b'0' * 16
 ONE_MB = b'\x89PNG\r\n\x1a\n' + b'0' * (1024 * 1024 - 8)
@@ -295,3 +295,76 @@ class ProdutoImageFormTests(TestCase):
         form = self._form(files)
         self.assertFalse(form.is_valid())
         self.assertIn('8', form.errors['imagens'][0])
+
+
+class ProdutoNovosTamanhosTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_superuser(
+            username='staff',
+            email='staff@example.com',
+            password='password12345',
+        )
+        self.client.force_login(user)
+
+    def _criar(self, slug, tamanhos=(), novos=''):
+        return self.client.post(reverse('produtos:admin_criar'), {
+            'nome': slug,
+            'descricao': '',
+            'preco': '50.00',
+            'ativo': 'on',
+            'slug': slug,
+            'tamanhos': list(tamanhos),
+            'novos_tamanhos': novos,
+        })
+
+    def _tamanhos(self, slug):
+        return set(
+            ProdutoTamanho.objects.filter(produto__slug=slug)
+            .values_list('tamanho', flat=True)
+        )
+
+    def test_cria_tamanhos_novos_e_oferece_para_outros_produtos(self):
+        response = self._criar('calca', tamanhos=['M'], novos='XGG, 38')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._tamanhos('calca'), {'M', 'XGG', '38'})
+
+        form = self.client.get(reverse('produtos:admin_criar')).context['form']
+        valores = [valor for valor, _ in form.fields['tamanhos'].choices]
+        self.assertEqual(
+            valores,
+            ['PP', 'P', 'M', 'G', 'GG', 'XG', 'Unico', '38', 'XGG'],
+        )
+
+    def test_tamanho_existente_nao_e_duplicado(self):
+        response = self._criar('bermuda', novos='m, único, M')
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._tamanhos('bermuda'), {'M', 'Unico'})
+
+    def test_rejeita_tamanho_longo_demais(self):
+        response = self._criar('jaqueta', novos='TamanhoGigante')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('novos_tamanhos', response.context['form'].errors)
+        self.assertFalse(Produto.objects.filter(slug='jaqueta').exists())
+
+    def test_editar_remove_tamanho_novo_desmarcado(self):
+        self._criar('saia', tamanhos=['P'], novos='36')
+        produto = Produto.objects.get(slug='saia')
+        response = self.client.post(
+            reverse('produtos:admin_editar', args=[produto.id]),
+            {
+                'nome': 'saia',
+                'descricao': '',
+                'preco': '50.00',
+                'ativo': 'on',
+                'slug': 'saia',
+                'tamanhos': ['P'],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._tamanhos('saia'), {'P'})
+
+    def test_home_lista_padroes_antes_dos_novos(self):
+        self._criar('regata', tamanhos=['G', 'P', 'M'], novos='XGG')
+        home = self.client.get(reverse('produtos:home'))
+        item = next(p for p in home.context['catalogo_json'] if p['nome'] == 'regata')
+        self.assertEqual(item['tamanhos'], ['P', 'M', 'G', 'XGG'])

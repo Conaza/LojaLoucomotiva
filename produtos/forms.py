@@ -4,7 +4,7 @@ from django import forms
 from django.conf import settings
 from django.utils.text import slugify
 
-from .models import Produto, Tamanho
+from .models import TAMANHO_MAX_LENGTH, Produto, chave_tamanho, tamanhos_conhecidos
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -53,9 +53,20 @@ def _png_widget():
 class ProdutoAdminForm(forms.ModelForm):
     tamanhos = forms.MultipleChoiceField(
         label='Tamanhos disponíveis',
-        choices=Tamanho.choices,
         required=False,
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+    )
+    novos_tamanhos = forms.CharField(
+        label='Adicionar tamanhos',
+        required=False,
+        help_text=(
+            'Separe por vírgula. Cada tamanho pode ter até '
+            f'{TAMANHO_MAX_LENGTH} caracteres e fica disponível para os demais produtos.'
+        ),
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'ex.: XGG, 38, 40',
+        }),
     )
     imagens = MultipleFileField(
         label='Imagens',
@@ -87,6 +98,7 @@ class ProdutoAdminForm(forms.ModelForm):
     def __init__(self, *args, slug_readonly=False, gallery_count=0, **kwargs):
         super().__init__(*args, **kwargs)
         self.gallery_count = gallery_count
+        self.fields['tamanhos'].choices = tamanhos_conhecidos()
         self.fields['slug'].required = False
         if slug_readonly:
             self.fields['slug'].widget.attrs['readonly'] = True
@@ -157,8 +169,32 @@ class ProdutoAdminForm(forms.ModelForm):
     def clean_nova_imagem(self):
         return self._clean_png(self.cleaned_data.get('nova_imagem'))
 
+    def clean_novos_tamanhos(self):
+        raw = self.cleaned_data.get('novos_tamanhos') or ''
+        conhecidos = {
+            chave_tamanho(valor): valor for valor, _ in self.fields['tamanhos'].choices
+        }
+        novos = []
+        for item in raw.split(','):
+            item = ' '.join(item.split())
+            if not item:
+                continue
+            if len(item) > TAMANHO_MAX_LENGTH:
+                raise forms.ValidationError(
+                    f'Cada tamanho deve ter no máximo {TAMANHO_MAX_LENGTH} '
+                    f'caracteres: "{item}".'
+                )
+            valor = conhecidos.setdefault(chave_tamanho(item), item)
+            if valor not in novos:
+                novos.append(valor)
+        return novos
+
     def clean(self):
         cleaned = super().clean()
+        novos = cleaned.get('novos_tamanhos') or []
+        if novos:
+            marcados = cleaned.get('tamanhos') or []
+            cleaned['tamanhos'] = list(dict.fromkeys([*marcados, *novos]))
         for index in range(self.gallery_count):
             key = f'substituir_{index}'
             if key not in self.fields:

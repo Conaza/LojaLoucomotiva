@@ -4,7 +4,7 @@ from django.shortcuts import render
 from carrinho.serialize import cart_payload
 
 from .images import list_produto_images, read_produto_image
-from .models import Produto
+from .models import Produto, ordenar_tamanhos
 
 
 def produto_imagem(request, slug, filename):
@@ -26,11 +26,11 @@ def storefront_context(request):
             'nome': produto.nome,
             'descricao': produto.descricao,
             'preco': f'{produto.preco:.2f}',
-            'tamanhos': [
+            'tamanhos': ordenar_tamanhos(
                 t.tamanho
                 for t in produto.tamanhos.all()
                 if t.disponivel
-            ],
+            ),
             'imagens': list_produto_images(produto.slug, produto),
         })
     return {

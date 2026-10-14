@@ -26,7 +26,7 @@ from openpyxl import Workbook
 
 from carrinho import cart
 from produtos.images import first_produto_image
-from produtos.models import Produto
+from produtos.models import Produto, label_tamanho, ordenar_tamanhos
 
 from . import infinitepay
 from .forms import FinalizarPedidoForm
@@ -262,9 +262,10 @@ def admin_pedidos(request):
             'produto': p,
             'imagem': first_produto_image(p.slug),
             'tamanhos': [
-                t.get_tamanho_display()
-                for t in p.tamanhos.all()
-                if t.disponivel
+                label_tamanho(tamanho)
+                for tamanho in ordenar_tamanhos(
+                    t.tamanho for t in p.tamanhos.all() if t.disponivel
+                )
             ],
         }
         for p in produtos

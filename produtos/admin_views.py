@@ -18,7 +18,7 @@ from .images import (
     replace_produto_image,
     save_produto_images,
 )
-from .models import Produto, ProdutoTamanho, Tamanho
+from .models import Produto, ProdutoTamanho
 
 staff_required = staff_member_required(login_url=settings.LOGIN_URL)
 
@@ -37,25 +37,21 @@ def _image_limit_context() -> dict:
 
 def _sync_tamanhos(produto: Produto, selected: list[str]) -> None:
     selected_set = set(selected)
-    valid = {c.value for c in Tamanho}
-    selected_set &= valid
-
     existing = {t.tamanho: t for t in produto.tamanhos.all()}
-    for tamanho in valid:
-        if tamanho in selected_set:
-            obj = existing.get(tamanho)
-            if obj:
-                if not obj.disponivel:
-                    obj.disponivel = True
-                    obj.save(update_fields=['disponivel'])
-            else:
-                ProdutoTamanho.objects.create(
-                    produto=produto,
-                    tamanho=tamanho,
-                    disponivel=True,
-                )
-        elif tamanho in existing:
-            existing[tamanho].delete()
+
+    for tamanho, obj in existing.items():
+        if tamanho not in selected_set:
+            obj.delete()
+        elif not obj.disponivel:
+            obj.disponivel = True
+            obj.save(update_fields=['disponivel'])
+
+    for tamanho in selected_set - existing.keys():
+        ProdutoTamanho.objects.create(
+            produto=produto,
+            tamanho=tamanho,
+            disponivel=True,
+        )
 
 
 @staff_required

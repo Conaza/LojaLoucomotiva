@@ -57,6 +57,12 @@
       {% endfor %}
     </div>
     {% if form.tamanhos.errors %}<div class="text-danger small">{{ form.tamanhos.errors }}</div>{% endif %}
+    <div class="mt-3">
+      <label class="form-label small" for="{{ form.novos_tamanhos.id_for_label }}">{{ form.novos_tamanhos.label }}</label>
+      {{ form.novos_tamanhos }}
+      {% if form.novos_tamanhos.help_text %}<div class="form-text">{{ form.novos_tamanhos.help_text }}</div>{% endif %}
+      {% if form.novos_tamanhos.errors %}<div class="text-danger small">{{ form.novos_tamanhos.errors }}</div>{% endif %}
+    </div>
   </fieldset>
 
   <div class="mb-4">
