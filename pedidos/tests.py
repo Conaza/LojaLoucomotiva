@@ -26,20 +26,20 @@ class AdminPedidosExcelTests(TestCase):
             password='password12345',
         )
         self.client.force_login(user)
-        produto = Produto.objects.create(
+        self.produto = Produto.objects.create(
             nome='Camisa',
             preco='80.00',
             slug='camisa',
         )
-        pedido = Pedido.objects.create(
+        self.pedido = Pedido.objects.create(
             nome_cliente='Ana',
             contato='11999999999',
             forma_pagamento=FormaPagamento.PIX,
             valor_total='80.00',
         )
         ItemPedido.objects.create(
-            pedido=pedido,
-            produto=produto,
+            pedido=self.pedido,
+            produto=self.produto,
             nome_produto='Camisa',
             tamanho='M',
             quantidade=1,
@@ -64,15 +64,49 @@ class AdminPedidosExcelTests(TestCase):
         self.assertEqual(
             [cell.value for cell in sheet[1]],
             [
-                'Nome', 'Contato', 'Produtos', 'Pagamento',
-                'Status pagamento', 'Data', 'Valor total',
+                'Pedido', 'Nome', 'Contato', 'Pagamento', 'Status pagamento', 'Data',
+                'Produto', 'Tamanho', 'Quantidade', 'Valor unitário', 'Subtotal',
+                'Valor total',
             ],
         )
-        self.assertEqual(sheet['A2'].value, 'Ana')
-        self.assertEqual(sheet['B2'].value, '11999999999')
-        self.assertEqual(sheet['C2'].value, 'Camisa')
+        self.assertEqual(sheet['A2'].value, self.pedido.id)
+        self.assertEqual(sheet['B2'].value, 'Ana')
+        self.assertEqual(sheet['C2'].value, '11999999999')
         self.assertEqual(sheet['D2'].value, 'PIX')
-        self.assertEqual(sheet['G2'].value, 80)
+        self.assertEqual(sheet['G2'].value, 'Camisa')
+        self.assertEqual(sheet['H2'].value, 'M')
+        self.assertEqual(sheet['I2'].value, 1)
+        self.assertEqual(sheet['J2'].value, 80)
+        self.assertEqual(sheet['K2'].value, 80)
+        self.assertEqual(sheet['L2'].value, 80)
+
+    def test_excel_tem_uma_linha_por_item(self):
+        ItemPedido.objects.create(
+            pedido=self.pedido,
+            produto=self.produto,
+            nome_produto='Boné',
+            tamanho='Unico',
+            quantidade=2,
+            preco_unitario='30.00',
+            subtotal='60.00',
+        )
+        response = self.client.get(reverse('pedidos:admin_excel'))
+        sheet = load_workbook(BytesIO(response.content)).active
+        linhas = list(sheet.iter_rows(min_row=2, values_only=True))
+        self.assertEqual(len(linhas), 2)
+        for linha in linhas:
+            self.assertEqual(linha[:4], (self.pedido.id, 'Ana', '11999999999', 'PIX'))
+        bone = next(linha for linha in linhas if linha[6] == 'Boné')
+        self.assertEqual(bone[7:], ('Único', 2, 30, 60, 80))
+
+    def test_excel_inclui_pedido_sem_itens(self):
+        self.pedido.itens.all().delete()
+        response = self.client.get(reverse('pedidos:admin_excel'))
+        sheet = load_workbook(BytesIO(response.content)).active
+        linhas = list(sheet.iter_rows(min_row=2, values_only=True))
+        self.assertEqual(len(linhas), 1)
+        self.assertEqual(linhas[0][1], 'Ana')
+        self.assertEqual(linhas[0][6:], (None, None, None, None, None, 80))
 
     def test_visitante_nao_baixa_planilha(self):
         self.client.logout()

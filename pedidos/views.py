@@ -288,20 +288,31 @@ def admin_pedidos_excel(request):
     sheet = workbook.active
     sheet.title = 'Pedidos'
     sheet.append([
-        'Nome', 'Contato', 'Produtos', 'Pagamento',
-        'Status pagamento', 'Data', 'Valor total',
+        'Pedido', 'Nome', 'Contato', 'Pagamento', 'Status pagamento', 'Data',
+        'Produto', 'Tamanho', 'Quantidade', 'Valor unitário', 'Subtotal', 'Valor total',
     ])
     for pedido in pedidos:
         criado = timezone.localtime(pedido.data_criacao).replace(tzinfo=None)
-        sheet.append([
+        dados_pedido = [
+            pedido.id,
             pedido.nome_cliente,
             pedido.contato,
-            pedido.nomes_produtos(),
             pedido.get_forma_pagamento_display(),
             pedido.status_pagamento_display(),
             criado,
-            pedido.valor_total,
-        ])
+        ]
+        itens = pedido.itens.all()
+        if not itens:
+            sheet.append(dados_pedido + [None] * 5 + [pedido.valor_total])
+        for item in itens:
+            sheet.append(dados_pedido + [
+                item.nome_produto,
+                'Único' if item.tamanho == 'Unico' else item.tamanho,
+                item.quantidade,
+                item.preco_unitario,
+                item.subtotal,
+                pedido.valor_total,
+            ])
 
     buffer = BytesIO()
     workbook.save(buffer)
